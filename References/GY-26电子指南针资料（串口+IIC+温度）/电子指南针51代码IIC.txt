@@ -1,0 +1,571 @@
+// GY-26 IIC测试程序
+// 使用单片机STC89C51 
+// 晶振：11.0592M
+// 显示：LCD1602
+// 编译环境 Keil uVision2
+// 程序中把模块当24c04进行通信
+#include  <REG51.H>	
+#include  <math.h>    //Keil library  
+#include  <stdio.h>   //Keil library	
+#include  <INTRINS.H>
+#define   uchar unsigned char
+#define   uint unsigned int	
+#define   DataPort P0	//LCD1602数据端口
+
+#define	WriteDeviceAddress   0xE0	  //定义器件在IIC总线中的地址
+#define	ReadDviceAddress     0xE1     //器件在IIC总线中地址+1
+
+typedef unsigned char BYTE;
+typedef unsigned short WORD;
+
+BYTE BUF[8];                         //数据缓存区
+BYTE code res[6] _at_ 0x23;
+
+sbit	SCL=P1^0;      //iic时钟引脚定义
+sbit	SDA=P1^1;      //iic数据引脚定义
+sbit    LCM_RS=P2^0;   //LCD1602命令端口		
+sbit    LCM_RW=P2^1;   //LCD1602命令端口		
+sbit    LCM_EN=P2^2;   //LCD1602命令端口          
+sbit    KEY_1 =P2^6;   //按键1
+sbit    KEY_2 =P2^5;   //按键2
+sbit    KEY_3 =P2^4;   //按键3
+sbit    KEY_4 =P2^3;   //按键4		
+
+uchar templ,temph,cnt;
+uchar ge,shi,bai,qian;
+uint  dis_data,dis_data1;
+
+void delay(unsigned int k);
+void InitLcd();
+void WriteDataLCM(uchar dataW);
+void WriteCommandLCM(uchar CMD,uchar Attribc);
+void DisplayOneChar(uchar X,uchar Y,uchar DData);
+uchar HEX_TO_ASCII(uchar HEX_data);
+void conversion(uint temp_data);
+
+//------------------------------------
+
+void Delay5us();
+void Delay5ms();
+void AT24C04_Start();
+void AT24C04_Stop();
+void AT24C04_SendACK(bit ack);
+bit  AT24C04_RecvACK();
+void AT24C04_SendByte(BYTE dat);
+BYTE AT24C04_RecvByte();
+void AT24C04_ReadPage();
+void AT24C04_WritePage();
+void read_cmp(void);
+//-----------------------------------
+void cal_on();
+void cal_off();
+void recovery_factory();
+void CMP_OFFS();
+void IIC_ADDR_Change();
+void delay_10ms();
+
+
+//*********************************************************
+uchar HEX_TO_ASCII(uchar HEX_data)
+{uchar ASCII_data;
+	switch(HEX_data){       
+	   case 0x00:ASCII_data=0x30;break;
+	   case 0x01:ASCII_data=0x31;break;
+       case 0x02:ASCII_data=0x32;break;
+       case 0x03:ASCII_data=0x33;break;
+	   case 0x04:ASCII_data=0x34;break;
+	   case 0x05:ASCII_data=0x35;break;
+       case 0x06:ASCII_data=0x36;break;
+	   case 0x07:ASCII_data=0x37;break;
+	   case 0x08:ASCII_data=0x38;break;
+	   case 0x09:ASCII_data=0x39;break;
+	   case 0x0a:ASCII_data=0x41;break;
+	   case 0x0b:ASCII_data=0x42;break;
+	   case 0x0c:ASCII_data=0x43;break;
+       case 0x0d:ASCII_data=0x44;break;
+	   case 0x0e:ASCII_data=0x45;break;
+	   case 0x0f:ASCII_data=0x46;break;
+    } 
+    return(ASCII_data);  
+}
+//*********************************************************
+void conversion(uint temp_data)  
+{  
+    uchar ge_data,shi_data,bai_data ,qian_data;
+	qian_data=temp_data/1000 ;
+    temp_data=temp_data%1000;   //取余运算
+    bai_data=temp_data/100 ;
+    temp_data=temp_data%100;   //取余运算
+    shi_data=temp_data/10 ;
+    temp_data=temp_data%10;   //取余运算
+    ge_data=temp_data;
+    qian= qian_data;
+    bai = bai_data;
+    shi = shi_data;
+    ge  = ge_data ; 	
+}
+
+//*********************************************************
+void main()
+{ 
+   unsigned int i;
+   delay(500);			
+   InitLcd();
+   EA=0;
+   cnt=0;
+  while(1)            //循环
+  { 
+    read_cmp();   //读出数据
+//---------显示角度
+    dis_data=0;
+    dis_data=BUF[1];
+    dis_data<<=8;
+    dis_data|=BUF[2];
+
+    conversion(dis_data);
+	ge=HEX_TO_ASCII(ge);
+	shi=HEX_TO_ASCII(shi);
+	bai=HEX_TO_ASCII(bai);
+	qian=HEX_TO_ASCII(qian);
+
+    DisplayOneChar(0,0,qian); 
+    DisplayOneChar(1,0,bai); 
+    DisplayOneChar(2,0,shi); 
+    DisplayOneChar(3,0,'.'); 
+	DisplayOneChar(4,0,ge); 
+
+//---------显示温度
+    dis_data=0;
+    dis_data=BUF[5];
+    dis_data<<=8;
+    dis_data|=BUF[6];
+    
+	if(dis_data>4095){           //如果bit-12为1，即符号位为负
+	DisplayOneChar(0,1,'-');     //显示负号
+	dis_data&=0xefff;            //清符号位
+	}
+    else DisplayOneChar(0,1,' ');//如果bit-12为0,空格,清空
+
+    conversion(dis_data);
+	ge=HEX_TO_ASCII(ge);
+	shi=HEX_TO_ASCII(shi);
+	bai=HEX_TO_ASCII(bai);
+	qian=HEX_TO_ASCII(qian);
+
+    DisplayOneChar(1,1,qian); 
+    DisplayOneChar(2,1,bai); 
+    DisplayOneChar(3,1,shi); 
+    DisplayOneChar(4,1,'.'); 
+	DisplayOneChar(5,1,ge); 
+	DisplayOneChar(6,1,0XDF);    //温度单位
+	DisplayOneChar(7,1,'C'); //温度单位
+
+//-------显示磁偏量
+	dis_data1=0;
+    dis_data1=BUF[3];
+    dis_data1<<=8;
+    dis_data1|=BUF[4];
+
+    conversion(dis_data1);
+	ge=HEX_TO_ASCII(ge);
+	shi=HEX_TO_ASCII(shi);
+	bai=HEX_TO_ASCII(bai);
+	qian=HEX_TO_ASCII(qian);
+
+    DisplayOneChar(7,0,qian); 
+    DisplayOneChar(8,0,bai); 
+    DisplayOneChar(9,0,shi); 
+    DisplayOneChar(10,0,'.'); 
+	DisplayOneChar(11,0,ge); 
+
+//-------显示校准等级
+    conversion(BUF[7]);
+	ge=HEX_TO_ASCII(ge);
+	shi=HEX_TO_ASCII(shi);
+	bai=HEX_TO_ASCII(bai);
+	qian=HEX_TO_ASCII(qian);
+    DisplayOneChar(10,1,bai); 
+    DisplayOneChar(11,1,shi); 
+	DisplayOneChar(12,1,ge); 
+//----------按键检测
+
+    if(KEY_1==0){
+	    delay_10ms();
+	    if(KEY_1==0){
+ 	    cal_on(); 
+   	    while(KEY_1==0)delay_10ms();
+	    }
+    }	  
+    if(KEY_2==0){
+	  delay_10ms();
+	  if(KEY_2==0){
+	  cal_off();  
+      while(KEY_2==0)delay_10ms();
+	  }
+	}
+    if(KEY_3==0){
+	  delay_10ms();
+	  if(KEY_3==0){
+	  recovery_factory();  
+      while(KEY_3==0)delay_10ms();
+	  }
+	}
+    if(KEY_4==0){
+     delay_10ms();
+ 	 if(KEY_4==0){
+	// CMP_OFFS();  
+	 IIC_ADDR_Change();
+     while(KEY_4==0)delay_10ms();
+     }
+    }
+
+    for (i=0;i<4000;i++);               
+  }
+} 
+
+
+/*******************************/
+void delay(unsigned int k)	
+{						
+unsigned int i,j;				
+for(i=0;i<k;i++)
+{			
+for(j=0;j<121;j++)			
+{;}}						
+}
+/*******************************/
+void WaitForEnable(void)	
+{					
+DataPort=0xff;		
+LCM_RS=0;LCM_RW=1;_nop_();
+LCM_EN=1;_nop_();_nop_();
+while(DataPort&0x80);	
+LCM_EN=0;				
+}					
+/*******************************/
+void WriteCommandLCM(uchar CMD,uchar Attribc)
+{					
+if(Attribc)WaitForEnable();	
+LCM_RS=0;LCM_RW=0;_nop_();
+DataPort=CMD;_nop_();	
+LCM_EN=1;_nop_();_nop_();LCM_EN=0;
+}					
+/*******************************/
+void WriteDataLCM(uchar dataW)
+{					
+WaitForEnable();		
+LCM_RS=1;LCM_RW=0;_nop_();
+DataPort=dataW;_nop_();	
+LCM_EN=1;_nop_();_nop_();LCM_EN=0;
+}		
+/***********************************/
+void InitLcd()				
+{			
+WriteCommandLCM(0x38,1);	
+WriteCommandLCM(0x08,1);	
+WriteCommandLCM(0x01,1);	
+WriteCommandLCM(0x06,1);	
+WriteCommandLCM(0x0c,1);
+}			
+/***********************************/
+void DisplayOneChar(uchar X,uchar Y,uchar DData)
+{						
+Y&=1;						
+X&=15;						
+if(Y)X|=0x40;					
+X|=0x80;			
+WriteCommandLCM(X,0);		
+WriteDataLCM(DData);		
+}						
+/***********************************/
+/*
+void DisplayListChar(uchar X,uchar Y,uchar code *DData)
+{
+uchar ListLength=0; 
+Y&=0x1;                
+X&=0xF;                
+while(X<=15)             
+{                       
+DisplayOneChar(X,Y,DData[ListLength]);
+ListLength++;           
+X++;                 
+}                     
+}    
+*/                 
+/***********************************/
+//*********************************************************
+void read_cmp(void)
+{   uchar i;
+
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0x31);                   //发送一次测量角度
+    AT24C04_Stop();                           //停止信号
+
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();                               //延时，实际应用中可以执行其他程序
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+
+
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0x35);                   //发送一次测量温度
+    AT24C04_Stop();                           //停止信号
+
+    Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();
+	Delay5ms();                               //延时，实际应用中可以执行其他程序
+
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //发送存储单元地址，从0开始	
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress+1);   //发送设备地址+读信号
+	 for (i=0; i<8; i++)
+    {
+        BUF[i] = AT24C04_RecvByte();
+        if (i == 7)
+        {
+           AT24C04_SendACK(1);                //最后一个数据需要回NOACK
+        }
+        else
+        {
+          AT24C04_SendACK(0);                //回应ACK
+       }
+   }
+    AT24C04_Stop();                          //停止信号
+
+}
+
+//--------------------------------------------------
+
+/**************************************
+延时5微秒(STC90C52RC@12M)
+不同的工作环境,需要调整此函数，注意时钟过快时需要修改
+当改用1T的MCU时,请调整此延时函数
+**************************************/
+void Delay5us()
+{
+    _nop_();_nop_();_nop_();_nop_();
+    _nop_();_nop_();_nop_();_nop_();
+	_nop_();_nop_();_nop_();_nop_();
+    _nop_();_nop_();_nop_();_nop_();
+	_nop_();_nop_();_nop_();_nop_();
+    _nop_();_nop_();_nop_();_nop_();  
+}
+
+/**************************************
+延时5毫秒(STC90C52RC@12M)
+不同的工作环境,需要调整此函数
+当改用1T的MCU时,请调整此延时函数
+**************************************/
+void Delay5ms()
+{
+    WORD n = 560;
+
+    while (n--);
+}
+
+/**************************************
+起始信号
+**************************************/
+void AT24C04_Start()
+{
+    SDA = 1;                    //拉高数据线
+    SCL = 1;                    //拉高时钟线
+    Delay5us();                 //延时
+    SDA = 0;                    //产生下降沿
+    Delay5us();                 //延时
+    SCL = 0;                    //拉低时钟线
+}
+
+/**************************************
+停止信号
+**************************************/
+void AT24C04_Stop()
+{
+    SDA = 0;                    //拉低数据线
+    SCL = 1;                    //拉高时钟线
+    Delay5us();                 //延时
+    SDA = 1;                    //产生上升沿
+    Delay5us();                 //延时
+}
+
+/**************************************
+发送应答信号
+入口参数:ack (0:ACK 1:NAK)
+**************************************/
+void AT24C04_SendACK(bit ack)
+{
+    SDA = ack;                  //写应答信号
+    SCL = 1;                    //拉高时钟线
+    Delay5us();                 //延时
+    SCL = 0;                    //拉低时钟线
+    Delay5us();                 //延时
+}
+
+/**************************************
+接收应答信号
+**************************************/
+bit AT24C04_RecvACK()
+{
+    SCL = 1;                    //拉高时钟线
+    Delay5us();                 //延时
+    CY = SDA;                   //读应答信号
+    SCL = 0;                    //拉低时钟线
+    Delay5us();                 //延时
+
+    return CY;
+}
+
+/**************************************
+向IIC总线发送一个字节数据
+**************************************/
+void AT24C04_SendByte(BYTE dat)
+{
+    BYTE i;
+
+    for (i=0; i<8; i++)         //8位计数器
+    {
+        dat <<= 1;              //移出数据的最高位
+        SDA = CY;               //送数据口
+        SCL = 1;                //拉高时钟线
+        Delay5us();             //延时
+        SCL = 0;                //拉低时钟线
+        Delay5us();             //延时
+    }
+    AT24C04_RecvACK();
+}
+
+/**************************************
+从IIC总线接收一个字节数据
+**************************************/
+BYTE AT24C04_RecvByte()
+{
+    BYTE i;
+    BYTE dat = 0;
+
+    SDA = 1;                    //使能内部上拉,准备读取数据,
+    for (i=0; i<8; i++)         //8位计数器
+    {
+        dat <<= 1;
+        SCL = 1;                //拉高时钟线
+        Delay5us();             //延时
+        dat |= SDA;             //读数据               
+        SCL = 0;                //拉低时钟线
+        Delay5us();             //延时
+    }
+
+    return dat;
+}
+
+//*********************************************************
+void cal_on(void)
+{                                             //校准
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0xC0);                   //发送校准命令
+    AT24C04_Stop();                           //发送停止信号
+}
+//*********************************************************
+void cal_off(void)                            //关闭校准
+{
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0xC1);                   //发送停止校准命令
+    AT24C04_Stop();                           //发送停止信号
+}
+//*********************************************************
+void recovery_factory(void)                   //恢复出厂设置
+{
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0xA0);                   //发送数据0xA0
+    AT24C04_Stop();                           //发送停止信号
+
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0xAA);                   //发送数据0xAA
+    AT24C04_Stop();                           //发送停止信号
+
+    AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0xA5);                   //发送数据0xA5
+    AT24C04_Stop();                           //发送停止信号
+
+	AT24C04_Start();                          //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);     //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                   //0表示命令 
+    AT24C04_SendByte(0xC5);                   //发送0xC5,恢复出厂命令
+    AT24C04_Stop();                           //发送停止信号
+
+}
+//*********************************************************
+void IIC_ADDR_Change(void)                   //iic地址更改
+{
+    AT24C04_Start();                         //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);    //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                  //0表示命令 
+    AT24C04_SendByte(0xA0);                  //发送数据0xA0
+    AT24C04_Stop();                          //发送停止信号
+
+    AT24C04_Start();                        //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);   //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                 //0表示命令 
+    AT24C04_SendByte(0xAA);                 //发送数据0xAA
+    AT24C04_Stop();                         //发送停止信号
+
+    AT24C04_Start();                        //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);   //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                 //0表示命令 
+    AT24C04_SendByte(0xA5);                 //发送数据0xA5
+    AT24C04_Stop();                         //发送停止信号
+
+	AT24C04_Start();                        //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);   //发送设备地址+写信号
+    AT24C04_SendByte(0x00);                 //0表示命令 
+    AT24C04_SendByte(0xE8);                 //新的IIC地址E0-FE中偶数(参考PDF文档)
+    AT24C04_Stop();                         //发送停止信号
+
+}
+//*********************************************************
+void CMP_OFFS(void)                         //磁偏角
+{
+    AT24C04_Start();                        //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);   //发送设备地址+写信号
+    AT24C04_SendByte(0x03);                 //0表示命令 
+    AT24C04_SendByte(0x00);                 //磁偏角高8位，写入0
+    AT24C04_Stop();                         //发送停止信号
+
+    AT24C04_Start();                        //起始信号
+    AT24C04_SendByte(WriteDeviceAddress);   //发送设备地址+写信号
+    AT24C04_SendByte(0x04);                 //0表示命令 
+    AT24C04_SendByte(0x64);                 //磁偏角低8位，写入100（实际是10.0度）
+    AT24C04_Stop();                         //发送停止信号
+}
+//*********************************************************
+void Delay_10ms(void)
+{
+    int n=560;
+    while (n--);
+}
+
+//参考宏晶网站24c04通信程序

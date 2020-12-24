@@ -1,0 +1,942 @@
+__start:
+__text_start:
+      86 EFCF      LDI	R28,0xFF
+      87 E2D1      LDI	R29,0x21
+      88 BFCD      OUT	0x3D,R28
+      89 BFDE      OUT	0x3E,R29
+      8A 51CE      SUBI	R28,0x1E
+      8B 40D0      SBCI	R29,0
+      8C EA0A      LDI	R16,0xAA
+      8D 8308      STD	Y+0,R16
+      8E 2400      CLR	R0
+      8F E2E7      LDI	R30,0x27
+      90 E0F2      LDI	R31,2
+      91 E012      LDI	R17,2
+      92 32E7      CPI	R30,0x27
+      93 07F1      CPC	R31,R17
+      94 F011      BEQ	0x0097
+      95 9201      ST	R0,Z+
+      96 CFFB      RJMP	0x0092
+      97 8300      STD	Z+0,R16
+      98 EEE4      LDI	R30,0xE4
+      99 E0F0      LDI	R31,0
+      9A E0A0      LDI	R26,0
+      9B E0B2      LDI	R27,2
+      9C E011      LDI	R17,1
+      9D E000      LDI	R16,0
+      9E BF0B      OUT	0x3B,R16
+      9F 30EB      CPI	R30,0xB
+      A0 07F1      CPC	R31,R17
+      A1 F021      BEQ	0x00A6
+      A2 95C8      LPM
+      A3 9631      ADIW	R30,1
+      A4 920D      ST	R0,X+
+      A5 CFF9      RJMP	0x009F
+      A6 940E 01EA CALL	_main
+_exit:
+      A8 CFFF      RJMP	_exit
+FILE: D:\MCU_Project\MCU_AVR\AVR_GY-26_IIC\delay.h
+(0001) /*-----------------------------------------------------------------------
+(0002) 延时函数
+(0003) 编译器：ICC-AVR v6.31A 
+(0004) 目标芯片 : M16
+(0005) 时钟: 8.0000Mhz
+(0006) -----------------------------------------------------------------------*/
+(0007) #ifndef __delay_h
+(0008) #define __delay_h
+(0009) void delay_nus(unsigned int n);
+(0010) void delay_nms(unsigned int n);
+(0011) void delay_1us(void);
+(0012) void delay_1ms(void) ; 
+(0013) 
+(0014) void delay_1us(void)                 //1us延时函数
+(0015)   {
+(0016)    asm("nop");
+_delay_1us:
+      A9 0000      NOP
+      AA 9508      RET
+_delay_nus:
+  i                    --> R20
+  n                    --> R10
+      AB 940E 028E CALL	push_xgset300C
+      AD 0158      MOVW	R10,R16
+(0017)   }
+(0018) 
+(0019) void delay_nus(unsigned int n)       //N us延时函数
+(0020)   {
+(0021)    unsigned int i=0;
+      AE 2744      CLR	R20
+      AF 2755      CLR	R21
+(0022)    for (i=0;i<n;i++)
+      B0 C003      RJMP	0x00B4
+(0023)    delay_1us();
+      B1 DFF7      RCALL	_delay_1us
+      B2 5F4F      SUBI	R20,0xFF
+      B3 4F5F      SBCI	R21,0xFF
+      B4 154A      CP	R20,R10
+      B5 055B      CPC	R21,R11
+      B6 F3D0      BCS	0x00B1
+      B7 940C 0293 JMP	pop_xgset300C
+(0024)   }
+(0025)   
+(0026) void delay_1ms(void)                 //1ms延时函数
+(0027)   {
+(0028)    unsigned int i;
+(0029)    for (i=0;i<1140;i++);
+_delay_1ms:
+  i                    --> R16
+      B9 2700      CLR	R16
+      BA 2711      CLR	R17
+      BB C002      RJMP	0x00BE
+      BC 5F0F      SUBI	R16,0xFF
+      BD 4F1F      SBCI	R17,0xFF
+      BE 3704      CPI	R16,0x74
+      BF E0E4      LDI	R30,4
+      C0 071E      CPC	R17,R30
+      C1 F3D0      BCS	0x00BC
+      C2 9508      RET
+_delay_nms:
+  i                    --> R20
+  n                    --> R10
+      C3 940E 028E CALL	push_xgset300C
+      C5 0158      MOVW	R10,R16
+(0030)   }
+(0031)   
+(0032) void delay_nms(unsigned int n)       //N ms延时函数
+(0033)   {
+(0034)    unsigned int i=0;
+      C6 2744      CLR	R20
+      C7 2755      CLR	R21
+(0035)    for (i=0;i<n;i++)
+      C8 C003      RJMP	0x00CC
+(0036)    delay_1ms();
+      C9 DFEF      RCALL	_delay_1ms
+      CA 5F4F      SUBI	R20,0xFF
+      CB 4F5F      SBCI	R21,0xFF
+      CC 154A      CP	R20,R10
+      CD 055B      CPC	R21,R11
+      CE F3D0      BCS	0x00C9
+      CF 940C 0293 JMP	pop_xgset300C
+FILE: D:\MCU_Project\MCU_AVR\AVR_GY-26_IIC\I2C.h
+(0001) #include <macros.h>
+(0002) #include "delay.h"
+(0003) //使用AVR内部硬件iic，引脚定义
+(0004) //PC0->SCL  ;  PC1->SDA
+(0005) //I2C 状态定义
+(0006) //MT 主方式传输 MR 主方式接受
+(0007) #define START			0x08
+(0008) #define RE_START		0x10
+(0009) #define MT_SLA_ACK		0x18
+(0010) #define MT_SLA_NOACK 	0x20
+(0011) #define MT_DATA_ACK		0x28
+(0012) #define MT_DATA_NOACK	0x30
+(0013) #define MR_SLA_ACK		0x40
+(0014) #define MR_SLA_NOACK	0x48
+(0015) #define MR_DATA_ACK		0x50
+(0016) #define MR_DATA_NOACK	0x58		
+(0017) 
+(0018) #define RD_DEVICE_ADDR 0xE1   //前4位器件固定,后三位看连线,最后1位是读写指令位
+(0019) #define WD_DEVICE_ADDR 0xE0
+(0020) 
+(0021) //常用TWI操作(主模式写和读)
+(0022) #define Start()			(TWCR=(1<<TWINT)|(1<<TWSTA)|(1<<TWEN))		//启动I2C
+(0023) #define Stop()			(TWCR=(1<<TWINT)|(1<<TWSTO)|(1<<TWEN))		//停止I2C
+(0024) #define Wait()			{while(!(TWCR&(1<<TWINT)));}				//等待中断发生
+(0025) #define TestAck()		(TWSR&0xf8)									//观察返回状态
+(0026) #define SetAck			(TWCR|=(1<<TWEA))							//做出ACK应答
+(0027) #define SetNoAck		(TWCR&=~(1<<TWEA))							//做出Not Ack应答
+(0028) #define Twi()			(TWCR=(1<<TWINT)|(1<<TWEN))				    //启动I2C
+(0029) #define Write8Bit(x)	{TWDR=(x);TWCR=(1<<TWINT)|(1<<TWEN);}		//写数据到TWDR
+(0030) 
+(0031) unsigned char I2C_Write(unsigned char Wdata,unsigned char RegAddress);
+(0032) unsigned char I2C_Read(unsigned RegAddress);
+(0033) 
+(0034) /*********************************************
+(0035) I2C总线写一个字节
+(0036) 返回0:写成功
+(0037) 返回1:写失败
+(0038) **********************************************/
+(0039) unsigned char I2C_Write(unsigned char Wdata,unsigned char RegAddress)
+(0040) {
+(0041) 	  Start();						//I2C启动
+_I2C_Write:
+  RegAddress           --> R18
+  Wdata                --> R16
+      D1 EA84      LDI	R24,0xA4
+      D2 BF86      OUT	0x36,R24
+(0042) 	  Wait();
+      D3 B626      IN	R2,0x36
+      D4 FE27      SBRS	R2,7
+      D5 CFFD      RJMP	0x00D3
+(0043) 	  if(TestAck()!=START) 
+      D6 B181      IN	R24,0x01
+      D7 7F88      ANDI	R24,0xF8
+      D8 3088      CPI	R24,0x8
+      D9 F011      BEQ	0x00DC
+(0044) 		return 1;					//ACK
+      DA E001      LDI	R16,1
+      DB C028      RJMP	0x0104
+(0045) 	  
+(0046) 	  Write8Bit(WD_DEVICE_ADDR);	//写I2C从器件地址和写方式
+      DC EE80      LDI	R24,0xE0
+      DD B983      OUT	0x03,R24
+      DE E884      LDI	R24,0x84
+      DF BF86      OUT	0x36,R24
+(0047) 	  Wait();
+      E0 B626      IN	R2,0x36
+      E1 FE27      SBRS	R2,7
+      E2 CFFD      RJMP	0x00E0
+(0048) 	  if(TestAck()!=MT_SLA_ACK) 
+      E3 B181      IN	R24,0x01
+      E4 7F88      ANDI	R24,0xF8
+      E5 3188      CPI	R24,0x18
+      E6 F011      BEQ	0x00E9
+(0049) 		return 1;					//ACK
+      E7 E001      LDI	R16,1
+      E8 C01B      RJMP	0x0104
+(0050) 	  
+(0051) 	  Write8Bit(RegAddress);		//写器件相应寄存器地址
+      E9 B923      OUT	0x03,R18
+      EA E884      LDI	R24,0x84
+      EB BF86      OUT	0x36,R24
+(0052) 	  Wait();
+      EC B626      IN	R2,0x36
+      ED FE27      SBRS	R2,7
+      EE CFFD      RJMP	0x00EC
+(0053) 	  if(TestAck()!=MT_DATA_ACK) 
+      EF B181      IN	R24,0x01
+      F0 7F88      ANDI	R24,0xF8
+      F1 3288      CPI	R24,0x28
+      F2 F011      BEQ	0x00F5
+(0054) 	  	return 1;				    //ACK
+      F3 E001      LDI	R16,1
+      F4 C00F      RJMP	0x0104
+(0055) 	  
+(0056) 	  Write8Bit(Wdata);			 	//写数据到器件相应寄存器
+      F5 B903      OUT	0x03,R16
+      F6 E884      LDI	R24,0x84
+      F7 BF86      OUT	0x36,R24
+(0057) 	  Wait();
+      F8 B626      IN	R2,0x36
+      F9 FE27      SBRS	R2,7
+      FA CFFD      RJMP	0x00F8
+(0058) 	  if(TestAck()!=MT_DATA_ACK) 
+      FB B181      IN	R24,0x01
+      FC 7F88      ANDI	R24,0xF8
+      FD 3288      CPI	R24,0x28
+      FE F011      BEQ	0x0101
+(0059) 	  	return 1;				    //ACK	 
+      FF E001      LDI	R16,1
+     100 C003      RJMP	0x0104
+(0060) 	  Stop();  						//I2C停止
+     101 E984      LDI	R24,0x94
+     102 BF86      OUT	0x36,R24
+(0061)  	//delay_nms(10);				//延时  
+(0062) 	  return 0;
+     103 2700      CLR	R16
+     104 9508      RET
+_I2C_Read:
+  temp                 --> R10
+  RegAddress           --> R16
+     105 92AA      ST	R10,-Y
+(0063) }
+(0064) 
+(0065) /*********************************************
+(0066) I2C总线读一个字节
+(0067) 返回0:读成功
+(0068) 返回1:读失败
+(0069) **********************************************/
+(0070) 
+(0071) unsigned char I2C_Read(unsigned RegAddress)
+(0072) 
+(0073)  {
+(0074) 	   unsigned char temp;
+(0075) 	   Start();//I2C启动
+     106 EA84      LDI	R24,0xA4
+     107 BF86      OUT	0x36,R24
+(0076) 	   Wait();
+     108 B626      IN	R2,0x36
+     109 FE27      SBRS	R2,7
+     10A CFFD      RJMP	0x0108
+(0077) 	   if (TestAck()!=START) 
+     10B B181      IN	R24,0x01
+     10C 7F88      ANDI	R24,0xF8
+     10D 3088      CPI	R24,0x8
+     10E F011      BEQ	0x0111
+(0078) 	   	  return 1;			 		//ACK	   
+     10F E001      LDI	R16,1
+     110 C040      RJMP	0x0151
+(0079) 	   
+(0080) 	   Write8Bit(WD_DEVICE_ADDR);	//写I2C从器件地址和写方式
+     111 EE80      LDI	R24,0xE0
+     112 B983      OUT	0x03,R24
+     113 E884      LDI	R24,0x84
+     114 BF86      OUT	0x36,R24
+(0081) 	   Wait(); 
+     115 B626      IN	R2,0x36
+     116 FE27      SBRS	R2,7
+     117 CFFD      RJMP	0x0115
+(0082) 	   if (TestAck()!=MT_SLA_ACK) 
+     118 B181      IN	R24,0x01
+     119 7F88      ANDI	R24,0xF8
+     11A 3188      CPI	R24,0x18
+     11B F011      BEQ	0x011E
+(0083) 	   	  return 1;				    //ACK
+     11C E001      LDI	R16,1
+     11D C033      RJMP	0x0151
+(0084) 	   
+(0085) 	   Write8Bit(RegAddress);		//写器件相应寄存器地址
+     11E B903      OUT	0x03,R16
+     11F E884      LDI	R24,0x84
+     120 BF86      OUT	0x36,R24
+(0086) 	   Wait();
+     121 B626      IN	R2,0x36
+     122 FE27      SBRS	R2,7
+     123 CFFD      RJMP	0x0121
+(0087) 	   if (TestAck()!=MT_DATA_ACK) 
+     124 B181      IN	R24,0x01
+     125 7F88      ANDI	R24,0xF8
+     126 3288      CPI	R24,0x28
+     127 F011      BEQ	0x012A
+(0088) 	   	  return 1;
+     128 E001      LDI	R16,1
+     129 C027      RJMP	0x0151
+(0089) 	   
+(0090) 	   Start();	   				   	//I2C重新启动
+     12A EA84      LDI	R24,0xA4
+     12B BF86      OUT	0x36,R24
+(0091) 	   Wait();
+     12C B626      IN	R2,0x36
+     12D FE27      SBRS	R2,7
+     12E CFFD      RJMP	0x012C
+(0092) 	   if (TestAck()!=RE_START)  
+     12F B181      IN	R24,0x01
+     130 7F88      ANDI	R24,0xF8
+     131 3180      CPI	R24,0x10
+     132 F011      BEQ	0x0135
+(0093) 	   	  return 1;
+     133 E001      LDI	R16,1
+     134 C01C      RJMP	0x0151
+(0094) 	   
+(0095) 	   Write8Bit(RD_DEVICE_ADDR);	//写I2C从器件地址和读方式
+     135 EE81      LDI	R24,0xE1
+     136 B983      OUT	0x03,R24
+     137 E884      LDI	R24,0x84
+     138 BF86      OUT	0x36,R24
+(0096) 	   Wait();
+     139 B626      IN	R2,0x36
+     13A FE27      SBRS	R2,7
+     13B CFFD      RJMP	0x0139
+(0097) 	   if(TestAck()!=MR_SLA_ACK)  
+     13C B181      IN	R24,0x01
+     13D 7F88      ANDI	R24,0xF8
+     13E 3480      CPI	R24,0x40
+     13F F011      BEQ	0x0142
+(0098) 	   	  return 1;				   //ACK
+     140 E001      LDI	R16,1
+     141 C00F      RJMP	0x0151
+(0099) 	   
+(0100) 	   Twi();	 				   //启动主I2C读方式
+     142 E884      LDI	R24,0x84
+     143 BF86      OUT	0x36,R24
+(0101) 	   Wait();
+     144 B626      IN	R2,0x36
+     145 FE27      SBRS	R2,7
+     146 CFFD      RJMP	0x0144
+(0102) 	   if(TestAck()!=MR_DATA_NOACK) 
+     147 B181      IN	R24,0x01
+     148 7F88      ANDI	R24,0xF8
+     149 3588      CPI	R24,0x58
+     14A F011      BEQ	0x014D
+(0103) 	   	 return 1;					//ACK	
+     14B E001      LDI	R16,1
+     14C C004      RJMP	0x0151
+(0104) 	   
+(0105) 	   temp=TWDR;//读取I2C接收数据
+     14D B0A3      IN	R10,0x03
+(0106)        Stop();//I2C停止
+     14E E984      LDI	R24,0x94
+     14F BF86      OUT	0x36,R24
+(0107) 	   return temp;
+     150 2D0A      MOV	R16,R10
+     151 90A9      LD	R10,Y+
+     152 9508      RET
+_LCD_init:
+     153 9722      SBIW	R28,2
+FILE: D:\MCU_Project\MCU_AVR\AVR_GY-26_IIC\1602.h
+(0001) /* 用法：
+(0002)    LCD_init();
+(0003)    LCD_write_string(列,行,"字符串");
+(0004)    LCD_write_char(列,行,'字符'); 
+(0005)  ---------------------------------------------------------------
+(0006) 下面是AVR与LCD连接信息
+(0007)   PC6 ->RS
+(0008)   PC7 ->EN
+(0009)   地  ->RW
+(0010)   PA4 ->D4
+(0011)   PA5 ->D5
+(0012)   PA6 ->D6
+(0013)   PA7 ->D7
+(0014) 使用端口：1602:PC6,PC7,PA4~PA7 	
+(0015) 要使用本驱动，改变下面配置信息即可
+(0016) -----------------------------------------------------------------*/
+(0017) #define LCD_EN_PORT    PORTC   //以下2个要设为同一个口
+(0018) #define LCD_EN_DDR     DDRC
+(0019) #define LCD_RS_PORT    PORTC   //以下2个要设为同一个口
+(0020) #define LCD_RS_DDR     DDRC
+(0021) #define LCD_DATA_PORT  PORTA   //以下3个要设为同一个口
+(0022) #define LCD_DATA_DDR   DDRA    //默认情况下连线必须使用高四位端口,如果不是请注意修改
+(0023) #define LCD_DATA_PIN   PINA
+(0024) #define LCD_RS         (1<<PC6) //0x20   portC6       out
+(0025) #define LCD_EN         (1<<PC7) //0x40   portC7       out
+(0026) #define LCD_DATA       ((1<<PA4)|(1<<PA5)|(1<<PA6)|(1<<PA7)) //0xf0   portA 4/5/6/7 out
+(0027) /*--------------------------------------------------------------------------------------------------
+(0028) 函数说明
+(0029) --------------------------------------------------------------------------------------------------*/
+(0030) void LCD_init(void);
+(0031) void LCD_en_write(void);
+(0032) void LCD_write_command(unsigned  char command) ;
+(0033) void LCD_write_data(unsigned char data);
+(0034) void LCD_set_xy (unsigned char x, unsigned char y);
+(0035) void LCD_write_string(unsigned char X,unsigned char Y,unsigned char *s);
+(0036) void LCD_write_char(unsigned char X,unsigned char Y,unsigned char data);
+(0037) 
+(0038) //-----------------------------------------------------------------------------------------
+(0039) 
+(0040) #include <macros.h>
+(0041) #include "delay.h"
+(0042) 
+(0043) void LCD_init(void)         //液晶初始化
+(0044) {
+(0045)   LCD_DATA_DDR|=LCD_DATA;   //数据口方向为输出
+     154 B38A      IN	R24,0x1A
+     155 6F80      ORI	R24,0xF0
+     156 BB8A      OUT	0x1A,R24
+(0046)   LCD_EN_DDR|=LCD_EN;       //设置EN方向为输出
+     157 9AA7      SBI	0x14,7
+(0047)   LCD_RS_DDR|=LCD_RS;       //设置RS方向为输出
+     158 9AA6      SBI	0x14,6
+(0048)   LCD_write_command(0x28); 
+     159 E208      LDI	R16,0x28
+     15A D023      RCALL	_LCD_write_command
+(0049)   LCD_en_write();
+     15B D01C      RCALL	_LCD_en_write
+(0050)   delay_nus(40);
+     15C E208      LDI	R16,0x28
+     15D E010      LDI	R17,0
+     15E DF4C      RCALL	_delay_nus
+(0051)   LCD_write_command(0x28);  //4位显示
+     15F E208      LDI	R16,0x28
+     160 D01D      RCALL	_LCD_write_command
+(0052)   LCD_write_command(0x0c);  //显示开
+     161 E00C      LDI	R16,0xC
+     162 D01B      RCALL	_LCD_write_command
+(0053)   LCD_write_command(0x01);  //清屏
+     163 E001      LDI	R16,1
+     164 D019      RCALL	_LCD_write_command
+(0054)   delay_nms(2);
+     165 E002      LDI	R16,2
+     166 E010      LDI	R17,0
+     167 DF5B      RCALL	_delay_nms
+(0055)   LCD_write_string(0,0,"Compass:       "); 
+     168 E187      LDI	R24,0x17
+     169 E092      LDI	R25,2
+     16A 8399      STD	Y+1,R25
+     16B 8388      STD	Y+0,R24
+     16C 2722      CLR	R18
+     16D 2700      CLR	R16
+     16E D05A      RCALL	_LCD_write_string
+(0056)   LCD_write_string(0,1,"  Temp :       ");
+     16F E087      LDI	R24,7
+     170 E092      LDI	R25,2
+     171 8399      STD	Y+1,R25
+     172 8388      STD	Y+0,R24
+     173 E021      LDI	R18,1
+     174 2700      CLR	R16
+     175 D053      RCALL	_LCD_write_string
+     176 9622      ADIW	R28,2
+     177 9508      RET
+(0057) }
+(0058) 
+(0059) void LCD_en_write(void)  //液晶使能
+(0060) {
+(0061)   LCD_EN_PORT|=LCD_EN;
+_LCD_en_write:
+     178 9AAF      SBI	0x15,7
+(0062)   delay_nus(1);
+     179 E001      LDI	R16,1
+     17A E010      LDI	R17,0
+     17B DF2F      RCALL	_delay_nus
+(0063)   LCD_EN_PORT&=~LCD_EN;
+     17C 98AF      CBI	0x15,7
+     17D 9508      RET
+_LCD_write_command:
+  command              --> R20
+     17E 934A      ST	R20,-Y
+     17F 2F40      MOV	R20,R16
+(0064) }
+(0065) 
+(0066) void LCD_write_command(unsigned char command) //写指令
+(0067) {
+(0068)   //连线为高4位的写法
+(0069)   delay_nus(16);
+     180 E100      LDI	R16,0x10
+     181 E010      LDI	R17,0
+     182 DF28      RCALL	_delay_nus
+(0070)   LCD_RS_PORT&=~LCD_RS;        //RS=0
+     183 98AE      CBI	0x15,6
+(0071)   LCD_DATA_PORT&=0X0f;         //清高四位
+     184 B38B      IN	R24,0x1B
+     185 708F      ANDI	R24,0xF
+     186 BB8B      OUT	0x1B,R24
+(0072)   LCD_DATA_PORT|=command&0xf0; //写高四位
+     187 2F84      MOV	R24,R20
+     188 7F80      ANDI	R24,0xF0
+     189 B22B      IN	R2,0x1B
+     18A 2A28      OR	R2,R24
+     18B BA2B      OUT	0x1B,R2
+(0073)   LCD_en_write();
+     18C DFEB      RCALL	_LCD_en_write
+(0074)   command=command<<4;          //低四位移到高四位
+     18D 2F84      MOV	R24,R20
+     18E 708F      ANDI	R24,0xF
+     18F 9582      SWAP	R24
+     190 2F48      MOV	R20,R24
+(0075)   LCD_DATA_PORT&=0x0f;         //清高四位
+     191 B38B      IN	R24,0x1B
+     192 708F      ANDI	R24,0xF
+     193 BB8B      OUT	0x1B,R24
+(0076)   LCD_DATA_PORT|=command&0xf0; //写低四位
+     194 2F84      MOV	R24,R20
+     195 7F80      ANDI	R24,0xF0
+     196 B22B      IN	R2,0x1B
+     197 2A28      OR	R2,R24
+     198 BA2B      OUT	0x1B,R2
+(0077)   LCD_en_write();
+     199 DFDE      RCALL	_LCD_en_write
+     19A 9149      LD	R20,Y+
+     19B 9508      RET
+_LCD_write_data:
+  data                 --> R20
+     19C 934A      ST	R20,-Y
+     19D 2F40      MOV	R20,R16
+(0078)  
+(0079) /*
+(0080)   //连线为低四位的写法
+(0081)   delay_nus(16);
+(0082)   LCD_RS_PORT&=~LCD_RS;        //RS=0
+(0083)   LCD_DATA_PORT&=0xf0;         //清高四位
+(0084)   LCD_DATA_PORT|=(command>>4)&0x0f; //写高四位
+(0085)   LCD_en_write();
+(0086)   LCD_DATA_PORT&=0xf0;         //清高四位
+(0087)   LCD_DATA_PORT|=command&0x0f; //写低四位
+(0088)   LCD_en_write(); 
+(0089) */
+(0090)   
+(0091) }
+(0092) 
+(0093) void LCD_write_data(unsigned char data) //写数据
+(0094) {
+(0095)   //连线为高4位的写法
+(0096)   delay_nus(16);
+     19E E100      LDI	R16,0x10
+     19F E010      LDI	R17,0
+     1A0 DF0A      RCALL	_delay_nus
+(0097)   LCD_RS_PORT|=LCD_RS;       //RS=1
+     1A1 9AAE      SBI	0x15,6
+(0098)   LCD_DATA_PORT&=0X0f;       //清高四位
+     1A2 B38B      IN	R24,0x1B
+     1A3 708F      ANDI	R24,0xF
+     1A4 BB8B      OUT	0x1B,R24
+(0099)   LCD_DATA_PORT|=data&0xf0;  //写高四位
+     1A5 2F84      MOV	R24,R20
+     1A6 7F80      ANDI	R24,0xF0
+     1A7 B22B      IN	R2,0x1B
+     1A8 2A28      OR	R2,R24
+     1A9 BA2B      OUT	0x1B,R2
+(0100)   LCD_en_write();
+     1AA DFCD      RCALL	_LCD_en_write
+(0101)   data=data<<4;               //低四位移到高四位
+     1AB 2F84      MOV	R24,R20
+     1AC 708F      ANDI	R24,0xF
+     1AD 9582      SWAP	R24
+     1AE 2F48      MOV	R20,R24
+(0102)   LCD_DATA_PORT&=0X0f;        //清高四位
+     1AF B38B      IN	R24,0x1B
+     1B0 708F      ANDI	R24,0xF
+     1B1 BB8B      OUT	0x1B,R24
+(0103)   LCD_DATA_PORT|=data&0xf0;   //写低四位
+     1B2 2F84      MOV	R24,R20
+     1B3 7F80      ANDI	R24,0xF0
+     1B4 B22B      IN	R2,0x1B
+     1B5 2A28      OR	R2,R24
+     1B6 BA2B      OUT	0x1B,R2
+(0104)   LCD_en_write();
+     1B7 DFC0      RCALL	_LCD_en_write
+     1B8 9149      LD	R20,Y+
+     1B9 9508      RET
+_LCD_set_xy:
+  address              --> R20
+  y                    --> R10
+  x                    --> R22
+     1BA 940E 0298 CALL	push_xgsetF00C
+     1BC 2EA2      MOV	R10,R18
+     1BD 2F60      MOV	R22,R16
+(0105)   
+(0106) /*
+(0107)   //连线为低四位的写法 
+(0108)   delay_nus(16);
+(0109)   LCD_RS_PORT|=LCD_RS;       //RS=1
+(0110)   LCD_DATA_PORT&=0Xf0;       //清高四位
+(0111)   LCD_DATA_PORT|=(data>>4)&0x0f;  //写高四位
+(0112)   LCD_en_write();
+(0113)  
+(0114)   LCD_DATA_PORT&=0Xf0;        //清高四位
+(0115)   LCD_DATA_PORT|=data&0x0f;   //写低四位
+(0116)   LCD_en_write();
+(0117) */
+(0118)   
+(0119) }
+(0120) 
+(0121) 
+(0122) void LCD_set_xy( unsigned char x, unsigned char y )  //写地址函数
+(0123) {
+(0124)     unsigned char address;
+(0125)     if (y == 0) address = 0x80 + x;
+     1BE 20AA      TST	R10
+     1BF F419      BNE	0x01C3
+     1C0 2F46      MOV	R20,R22
+     1C1 5840      SUBI	R20,0x80
+     1C2 C002      RJMP	0x01C5
+(0126)     else   address = 0xc0 + x;
+     1C3 2F46      MOV	R20,R22
+     1C4 5440      SUBI	R20,0x40
+(0127)     LCD_write_command( address);
+     1C5 2F04      MOV	R16,R20
+     1C6 DFB7      RCALL	_LCD_write_command
+     1C7 940C 029F JMP	pop_xgsetF00C
+_LCD_write_string:
+  s                    --> R20
+  Y                    --> R12
+  X                    --> R10
+     1C9 940E 02A6 CALL	push_xgset303C
+     1CB 2EC2      MOV	R12,R18
+     1CC 2EA0      MOV	R10,R16
+     1CD 814E      LDD	R20,Y+6
+     1CE 815F      LDD	R21,Y+7
+(0128) }
+(0129)   
+(0130) void LCD_write_string(unsigned char X,unsigned char Y,unsigned char *s) //列x=0~15,行y=0,1
+(0131) {
+(0132)     LCD_set_xy( X, Y ); //写地址    
+     1CF 2D2C      MOV	R18,R12
+     1D0 2D0A      MOV	R16,R10
+     1D1 DFE8      RCALL	_LCD_set_xy
+     1D2 C005      RJMP	0x01D8
+(0133)     while (*s)  // 写显示字符
+(0134)     {
+(0135)       LCD_write_data( *s );
+     1D3 01FA      MOVW	R30,R20
+     1D4 8100      LDD	R16,Z+0
+     1D5 DFC6      RCALL	_LCD_write_data
+(0136)       s ++;
+     1D6 5F4F      SUBI	R20,0xFF
+     1D7 4F5F      SBCI	R21,0xFF
+     1D8 01FA      MOVW	R30,R20
+     1D9 8020      LDD	R2,Z+0
+     1DA 2022      TST	R2
+     1DB F7B9      BNE	0x01D3
+     1DC 940C 02AD JMP	pop_xgset303C
+_LCD_write_char:
+  data                 --> Y,+2
+  Y                    --> R12
+  X                    --> R10
+     1DE 92AA      ST	R10,-Y
+     1DF 92CA      ST	R12,-Y
+     1E0 2EC2      MOV	R12,R18
+     1E1 2EA0      MOV	R10,R16
+(0137)     }
+(0138)       
+(0139) }
+(0140) 
+(0141) void LCD_write_char(unsigned char X,unsigned char Y,unsigned char data) //列x=0~15,行y=0,1
+(0142) {
+(0143)   LCD_set_xy( X, Y ); //写地址
+     1E2 2D2C      MOV	R18,R12
+     1E3 2D0A      MOV	R16,R10
+     1E4 DFD5      RCALL	_LCD_set_xy
+(0144)   LCD_write_data( data);
+     1E5 810A      LDD	R16,Y+2
+     1E6 DFB5      RCALL	_LCD_write_data
+     1E7 90C9      LD	R12,Y+
+     1E8 90A9      LD	R10,Y+
+     1E9 9508      RET
+_main:
+  temp_data            --> R10
+  cmp_data             --> R20
+  L                    --> R12
+  H                    --> R10
+  i                    --> R14
+     1EA 9722      SBIW	R28,2
+FILE: D:\MCU_Project\MCU_AVR\AVR_GY-26_IIC\AVR_GY-26_IIC.c
+(0001) #include <iom16v.h>
+(0002) #include "I2C.h"
+(0003) #include "1602.h"
+(0004) #include "delay.h"
+(0005) void conversion(unsigned int i);
+(0006) unsigned char display[7]={0,0,0,'.',0,0Xdf,0};//显示数据
+(0007) 
+(0008) /*******************************
+(0009) 主程序
+(0010) *******************************/
+(0011) void main(void)
+(0012) {	
+(0013) 	unsigned char H,L,i;
+(0014) 	unsigned int  cmp_data,temp_data;
+(0015) 	
+(0016) 	delay_nms(25);                    //lcd上电延时
+     1EB E109      LDI	R16,0x19
+     1EC E010      LDI	R17,0
+     1ED DED5      RCALL	_delay_nms
+(0017) 	LCD_init();                       //lcd初始化
+     1EE DF64      RCALL	_LCD_init
+     1EF C04A      RJMP	0x023A
+(0018) 	while(1){                         //循环   
+(0019) 	 i=I2C_Write(0x31,0x00);          //写测量角度命令，成功返回值0
+     1F0 2722      CLR	R18
+     1F1 E301      LDI	R16,0x31
+     1F2 DEDE      RCALL	_I2C_Write
+     1F3 2EE0      MOV	R14,R16
+(0020) 	 TWCR=0;                          //释放引脚
+     1F4 2422      CLR	R2
+     1F5 BE26      OUT	0x36,R2
+(0021)      delay_nms(15);                   //内部测量时间大于40ms，可执行其他程序 
+     1F6 E00F      LDI	R16,0xF
+     1F7 E010      LDI	R17,0
+     1F8 DECA      RCALL	_delay_nms
+(0022) 	   if(i==0){
+     1F9 20EE      TST	R14
+     1FA F4C9      BNE	0x0214
+(0023) 	     H=I2C_Read(0X01);            //读取角度高8位命令
+     1FB E001      LDI	R16,1
+     1FC E010      LDI	R17,0
+     1FD DF07      RCALL	_I2C_Read
+     1FE 2EA0      MOV	R10,R16
+(0024) 	     L=I2C_Read(0X02);            //读取角度低8位命令
+     1FF E002      LDI	R16,2
+     200 E010      LDI	R17,0
+     201 DF03      RCALL	_I2C_Read
+     202 2EC0      MOV	R12,R16
+(0025) 		 cmp_data=H;
+     203 2D4A      MOV	R20,R10
+     204 2755      CLR	R21
+(0026) 		 cmp_data<<=8;
+     205 2F54      MOV	R21,R20
+     206 2744      CLR	R20
+(0027) 		 cmp_data+=L;                 //高低位合成16位
+     207 2C2C      MOV	R2,R12
+     208 2433      CLR	R3
+     209 0D42      ADD	R20,R2
+     20A 1D53      ADC	R21,R3
+(0028) 	     conversion(cmp_data);        //数据转换出个，十，百，千 位       
+     20B 018A      MOVW	R16,R20
+     20C D030      RCALL	_conversion
+(0029) 		 LCD_write_string(9,0,display); //显示角度，从第9列开始   
+     20D E080      LDI	R24,0
+     20E E092      LDI	R25,2
+     20F 8399      STD	Y+1,R25
+     210 8388      STD	Y+0,R24
+     211 2722      CLR	R18
+     212 E009      LDI	R16,0x9
+     213 DFB5      RCALL	_LCD_write_string
+(0030) 	   }  
+(0031) 	 i=I2C_Write(0x35,0x00);          //写测量温度命令，成功返回值0
+     214 2722      CLR	R18
+     215 E305      LDI	R16,0x35
+     216 DEBA      RCALL	_I2C_Write
+     217 2F40      MOV	R20,R16
+     218 2EE4      MOV	R14,R20
+(0032) 	 TWCR=0;                          //释放引脚
+     219 2422      CLR	R2
+     21A BE26      OUT	0x36,R2
+(0033)      delay_nms(10);                   //内部测量时间大于40ms，可执行其他程序 
+     21B E00A      LDI	R16,0xA
+     21C E010      LDI	R17,0
+     21D DEA5      RCALL	_delay_nms
+(0034) 	   if(i==0){
+     21E 2344      TST	R20
+     21F F4D1      BNE	0x023A
+(0035) 	     H=I2C_Read(0X05);            //读取温度高8位命令
+     220 E005      LDI	R16,5
+     221 E010      LDI	R17,0
+     222 DEE2      RCALL	_I2C_Read
+     223 2EE0      MOV	R14,R16
+     224 2CAE      MOV	R10,R14
+(0036) 	     L=I2C_Read(0X06);            //读取温度低8位命令   
+     225 E006      LDI	R16,6
+     226 E010      LDI	R17,0
+     227 DEDD      RCALL	_I2C_Read
+     228 2EE0      MOV	R14,R16
+     229 2CCE      MOV	R12,R14
+(0037) 		 temp_data=H;
+     22A 24BB      CLR	R11
+(0038) 		 temp_data<<=8;
+     22B 2CBA      MOV	R11,R10
+     22C 24AA      CLR	R10
+(0039) 		 temp_data+=L;                //高低位合成16位 
+     22D 2C2C      MOV	R2,R12
+     22E 2433      CLR	R3
+     22F 0CA2      ADD	R10,R2
+     230 1CB3      ADC	R11,R3
+(0040) 	     conversion(temp_data);       //数据转换出个，十，百，千 位       
+     231 0185      MOVW	R16,R10
+     232 D00A      RCALL	_conversion
+(0041) 		 LCD_write_string(9,1,display);  //显示温度，从第9列开始  
+     233 E080      LDI	R24,0
+     234 E092      LDI	R25,2
+     235 8399      STD	Y+1,R25
+     236 8388      STD	Y+0,R24
+     237 E021      LDI	R18,1
+     238 E009      LDI	R16,0x9
+     239 DF8F      RCALL	_LCD_write_string
+     23A CFB5      RJMP	0x01F0
+     23B 9622      ADIW	R28,2
+     23C 9508      RET
+_conversion:
+  i                    --> R20
+     23D 934A      ST	R20,-Y
+     23E 935A      ST	R21,-Y
+     23F 01A8      MOVW	R20,R16
+(0042) 	   }
+(0043)     }
+(0044) }
+(0045) /*********************************************
+(0046) 数据转换
+(0047) 范围0-9999
+(0048) 结果以ascii存入显示区
+(0049) **********************************************/
+(0050) void conversion(unsigned int i)  
+(0051) {  
+(0052) 	display[0]=i/1000+0x30 ;
+     240 EE28      LDI	R18,0xE8
+     241 E033      LDI	R19,3
+     242 018A      MOVW	R16,R20
+     243 940E 0274 CALL	div16u
+     245 01C8      MOVW	R24,R16
+     246 96C0      ADIW	R24,0x30
+     247 9380 0200 STS	display,R24
+(0053)     i=i%1000;    //取余运算
+     249 EE28      LDI	R18,0xE8
+     24A E033      LDI	R19,3
+     24B 018A      MOVW	R16,R20
+     24C 940E 0272 CALL	mod16u
+     24E 01A8      MOVW	R20,R16
+(0054)     display[1]=i/100+0x30 ;
+     24F E624      LDI	R18,0x64
+     250 E030      LDI	R19,0
+     251 940E 0274 CALL	div16u
+     253 01C8      MOVW	R24,R16
+     254 96C0      ADIW	R24,0x30
+     255 9380 0201 STS	display+1,R24
+(0055)     i=i%100;    //取余运算
+     257 E624      LDI	R18,0x64
+     258 E030      LDI	R19,0
+     259 018A      MOVW	R16,R20
+     25A 940E 0272 CALL	mod16u
+     25C 01A8      MOVW	R20,R16
+(0056)     display[2]=i/10+0x30 ;
+     25D E02A      LDI	R18,0xA
+     25E E030      LDI	R19,0
+     25F 940E 0274 CALL	div16u
+     261 01C8      MOVW	R24,R16
+     262 96C0      ADIW	R24,0x30
+     263 9380 0202 STS	display+2,R24
+(0057)     i=i%10;     //取余运算
+     265 E02A      LDI	R18,0xA
+     266 E030      LDI	R19,0
+     267 018A      MOVW	R16,R20
+     268 940E 0272 CALL	mod16u
+     26A 01A8      MOVW	R20,R16
+(0058)     display[4]=i+0x30;  
+FILE: <library>
+     26B 01CA      MOVW	R24,R20
+     26C 96C0      ADIW	R24,0x30
+     26D 9380 0204 STS	0x0204,R24
+     26F 9159      LD	R21,Y+
+     270 9149      LD	R20,Y+
+     271 9508      RET
+mod16u:
+     272 9468      BSET	6
+     273 C001      RJMP	xdiv16u
+div16u:
+     274 94E8      BCLR	6
+xdiv16u:
+     275 92EA      ST	R14,-Y
+     276 92FA      ST	R15,-Y
+     277 938A      ST	R24,-Y
+     278 24EE      CLR	R14
+     279 24FF      CLR	R15
+     27A E180      LDI	R24,0x10
+     27B 0F00      LSL	R16
+     27C 1F11      ROL	R17
+     27D 1CEE      ROL	R14
+     27E 1CFF      ROL	R15
+     27F 16E2      CP	R14,R18
+     280 06F3      CPC	R15,R19
+     281 F018      BCS	0x0285
+     282 1AE2      SUB	R14,R18
+     283 0AF3      SBC	R15,R19
+     284 9503      INC	R16
+     285 958A      DEC	R24
+     286 F7A1      BNE	0x027B
+     287 F416      BRTC	0x028A
+     288 2D0E      MOV	R16,R14
+     289 2D1F      MOV	R17,R15
+     28A 9189      LD	R24,Y+
+     28B 90F9      LD	R15,Y+
+     28C 90E9      LD	R14,Y+
+     28D 9508      RET
+push_xgset300C:
+     28E 935A      ST	R21,-Y
+     28F 934A      ST	R20,-Y
+     290 92BA      ST	R11,-Y
+     291 92AA      ST	R10,-Y
+     292 9508      RET
+pop_xgset300C:
+     293 90A9      LD	R10,Y+
+     294 90B9      LD	R11,Y+
+     295 9149      LD	R20,Y+
+     296 9159      LD	R21,Y+
+     297 9508      RET
+push_xgsetF00C:
+     298 937A      ST	R23,-Y
+     299 936A      ST	R22,-Y
+     29A 935A      ST	R21,-Y
+     29B 934A      ST	R20,-Y
+     29C 92BA      ST	R11,-Y
+     29D 92AA      ST	R10,-Y
+     29E 9508      RET
+pop_xgsetF00C:
+     29F 90A9      LD	R10,Y+
+     2A0 90B9      LD	R11,Y+
+     2A1 9149      LD	R20,Y+
+     2A2 9159      LD	R21,Y+
+     2A3 9169      LD	R22,Y+
+     2A4 9179      LD	R23,Y+
+     2A5 9508      RET
+push_xgset303C:
+     2A6 935A      ST	R21,-Y
+     2A7 934A      ST	R20,-Y
+     2A8 92DA      ST	R13,-Y
+     2A9 92CA      ST	R12,-Y
+     2AA 92BA      ST	R11,-Y
+     2AB 92AA      ST	R10,-Y
+     2AC 9508      RET
+pop_xgset303C:
+     2AD 90A9      LD	R10,Y+
+     2AE 90B9      LD	R11,Y+
+     2AF 90C9      LD	R12,Y+
+     2B0 90D9      LD	R13,Y+
+     2B1 9149      LD	R20,Y+
+     2B2 9159      LD	R21,Y+
+     2B3 9508      RET

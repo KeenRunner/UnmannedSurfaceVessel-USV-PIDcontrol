@@ -1,0 +1,214 @@
+//  GY-26电子指南针模块测试程序
+//  使用单片机：STC89C52 
+//  晶振：  11.0592 M
+//  液晶屏：LCD1602
+#include<REG52.H>	
+#include<math.h>       //Keil library  
+#include<stdio.h>      //Keil library	
+#include<INTRINS.H>
+#define uchar unsigned char
+#define uint  unsigned int	
+#define DataPort P0	   //LCD1602 数据端口	
+sbit    LCM_RS=P2^0;   //LCD1602 控制端口		
+sbit    LCM_RW=P2^1;   //LCD1602 控制端口	
+sbit    LCM_EN=P2^2;   //LCD1602 控制端口
+sbit    KEY_1 =P2^6;
+sbit    KEY_2 =P2^5;
+sbit    KEY_3 =P2^4;
+sbit    KEY_4 =P2^3;	
+//********定义变量*****************************
+uchar   BUF[8];        //数据缓存区
+uchar   cnt;           //接收数据的累计值
+//********定义函数*****************************
+void    delay(unsigned int k);
+void    InitLcd();
+void    WriteDataLCM(uchar dataW);
+void    WriteCommandLCM(uchar CMD,uchar Attribc);
+void    DisplayOneChar(uchar X,uchar Y,uchar DData);
+void    SeriPushSend(uchar send_data);
+void    ReadKey(void);
+void 	display(void);
+//*********************************************
+//串口中断
+void serial_serve(void) interrupt 4	
+{
+  if(RI==1){
+    RI=0;
+    BUF[cnt]=SBUF;
+	cnt++;
+//	if(cnt==7)flag=1;
+  }
+}
+//*********************************************
+//串口初始化
+//9600 bps @ 11.059 MHz 
+void init_uart()
+{
+	TMOD=0x21;				
+	TH1=0xfd;				
+	TL1=0xfd;				
+	SCON=0x50;
+	PS=1;      //串口中断设为高优先级别
+	TR0=1;	   //启动定时器			
+	TR1=1;
+	ET0=1;     //打开定时器0中断			
+	ES=1;	
+}
+//*********LCD1602初始化**********************
+void InitLcd()				
+{			
+	WriteCommandLCM(0x38,1);	
+	WriteCommandLCM(0x08,1);	
+	WriteCommandLCM(0x01,1);
+	WriteCommandLCM(0x06,1);	
+	WriteCommandLCM(0x0c,1);
+}
+//**********检测忙信号************************
+void WaitForEnable(void)	
+{					
+	DataPort=0xff;		
+	LCM_RS=0;LCM_RW=1;_nop_();
+	LCM_EN=1;_nop_();_nop_();
+	while(DataPort&0x80);	
+	LCM_EN=0;				
+}					
+//**********写命令至LCD***********************
+void WriteCommandLCM(uchar CMD,uchar Attribc)
+{					
+	if(Attribc)WaitForEnable();	
+	LCM_RS=0;LCM_RW=0;_nop_();
+	DataPort=CMD;_nop_();	
+	LCM_EN=1;_nop_();_nop_();LCM_EN=0;
+}					
+//**********写数据至LCD************************
+void WriteDataLCM(uchar dataW)
+{					
+	WaitForEnable();		
+	LCM_RS=1;LCM_RW=0;_nop_();
+	DataPort=dataW;_nop_();	
+	LCM_EN=1;_nop_();_nop_();LCM_EN=0;
+}					
+//*********写一个字符数据到指定的目标***********
+void DisplayOneChar(uchar X,uchar Y,uchar DData)
+{						
+	Y&=1;						
+	X&=15;						
+	if(Y)X|=0x40;					
+	X|=0x80;			
+	WriteCommandLCM(X,0);		
+	WriteDataLCM(DData);		
+}
+//**********延时函数***************
+void delay(unsigned int k)	
+{						
+	unsigned int i,j;				
+	for(i=0;i<k;i++)
+	{			
+	for(j=0;j<121;j++)			
+	{;}
+	}						
+}						            
+//*********串口数据发送******************
+void  SeriPushSend(uchar send_data)
+{
+    SBUF=send_data;  
+	while(!TI);TI=0;	  
+}
+//*********按键检测**********************
+void ReadKey(void)
+{
+
+    EA=0;
+    if(KEY_1==0){
+       delay(50);
+       if(KEY_1==0){
+       SeriPushSend(0XC0);                                    //发送校准命令。
+	   display();
+       while(KEY_1==0);                                       //等待按键放开
+       }
+    }
+    if(KEY_2==0){
+       delay(50);
+       if(KEY_2==0){
+       SeriPushSend(0XC1);                                    //发送停止校准命令。
+	   display();
+       while(KEY_2==0);                                       //等待按键放开
+       }
+    }
+    if(KEY_3==0){
+       delay(50);
+       if(KEY_3==0){
+       SeriPushSend(0XA0);                                    //发送恢复出厂命令。
+	   display();
+       SeriPushSend(0XAA);                                    //发送恢复出厂命令。
+	   display();
+       SeriPushSend(0XA5);                                    //发送恢复出厂命令。
+	   display();
+       SeriPushSend(0XC5);                                    //发送恢复出厂命令。
+	   display();
+       while(KEY_3==0);                                       //等待按键放开
+       }
+    }
+
+    if(KEY_4==0){
+       delay(50);
+       if(KEY_4==0){
+       SeriPushSend(0X3);                                    //发送设定磁偏角高8位命令。
+	   display();
+       SeriPushSend(0X0);                                    //发送磁偏角高8位的数据。
+	   display();
+       SeriPushSend(0X4);                                    //发送设定磁偏角低8位命令
+	   display();
+       SeriPushSend(0X64);                                   //发送磁偏角低8位的数据。此时磁偏角被设定为10.0度
+	   display();
+       while(KEY_4==0);                                       //等待按键放开
+       }
+    }
+/*
+    if(KEY_5==0){
+       delay(50);
+       if(KEY_4==0){
+       SeriPushSend(0XAE);                                    //发送当前角度为0度命令。
+	   display();
+       while(KEY_4==0);                                       //等待按键放开
+       }
+    }
+*/
+
+    EA=1;
+ 
+}
+//*******************数据接收并显示**********************
+void display(void)
+{
+    uchar SUM;
+    uint   i ;
+   for (i=0;i<3000;i++);                                      //传送数据延时 
+	  if(BUF[0]==0X0D&&BUF[1]==0X0A){                         //帧头判断
+        SUM=BUF[6]+BUF[5]+BUF[4]+BUF[3]+BUF[2]+BUF[1]+BUF[0]; //校验和
+   	    if (BUF[7]==SUM){                                     //校验和判断
+          DisplayOneChar(0,0,BUF[2]);                         //角度百位值 写入LCD，因为是字符类型，所以不用转换，直接显示
+          DisplayOneChar(1,0,BUF[3]);                         //角度十位值 写入LCD
+          DisplayOneChar(2,0,BUF[4]);                         //角度个位值 写入LCD
+          DisplayOneChar(3,0,BUF[5]);                         //小数点
+ 	      DisplayOneChar(4,0,BUF[6]);                         //角度小数位值 写入LCD
+	    }                                                     //end if	
+      }
+}  
+//***************************************
+//主程序
+void main()
+{  uint   i ;
+   delay(500);	                                              //延时		
+   InitLcd();                                                 //初始化LCD
+   init_uart();                                               //初始化串口
+   EA=1;                                                      //开总中断
+  while(1){                                                   //循环
+    cnt=0;                                                    //接收数据的累计值
+    SeriPushSend(0X31);                                       //发送1帧读取命令。
+    display();                                          
+    ReadKey();                                                //按键检测        
+    for (i=0;i<12000;i++);                                    //一定时间的延时        
+   }                                                          //end while
+} 
+

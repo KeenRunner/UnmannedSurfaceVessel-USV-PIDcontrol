@@ -1,0 +1,119 @@
+﻿//////////////////////
+数据构成
+//////////////////////
+串口波特率:115200,1停止位，8数据位，无校验
+USB虚拟串口无波特率要求
+约定:
+1.上位机往下位机发送的消息，功能码为奇数，下位机往上位机发送，功能码为偶数
+2.帧长度为整个数据包长度，包括从帧头到校验码全部数据
+3.ID为下位机编号，为级联设计预留
+4.预留位，为后续协议扩展预留
+5.CRC校验为一字节，校验方式为CRC-8/MAXIM
+
+帧头   帧长度	 ID	   功能码   数据	        预留位  CRC校验
+0x5a   0x00		 0x01  0x00		  0xXX...0xXX   0x00    0xXX
+
+帧头：
+1Byte 0x5a 固定值
+帧长度：
+帧头(1 Byte)+帧长度(1 Byte)+ID(1 Byte)+功能码(1 Byte)+数据(0~250Byte))+预留位(1 Byte)+CRC校验(1 Byte)
+功能码：
+1Byte控制板端发送的功能码为偶数,控制板端接收的功能码为奇数
+数据：
+长度和内容具体参照各功能码定义
+预留位：
+目前设置为0x00，为将来协议可能的扩展预留
+CRC校验：
+1Byte，校验方式为CRC-8/MAXIM，设置为0xFF，则强制不进行CRC校验
+（参考在线计算网站：http://www.ip33.com/crc.html）
+
+上位机-模块建立连接定义：
+在未建立连接的状态下，模块收到协议内数据，则判定为建立连接，建立连接时，模块IMU会执行初始化，耗时0.01S左右，所以建议以不低于2hz的频率向模块发送指令
+
+上位机-模块断开连接定义：
+在建立连接状态后，超过1000ms没有收到新的协议内数据，模块判定断开连接
+
+
+
+功能码定义:
+
+0x17
+上位机向下位机查询IMU数据
+5a 06 01 17 00 ff
+
+0x18
+下位机向上位机回复IMU数据，数据长度为40Byte，数据类型为float类型
+Gyro 单位为rad/sec Accel单位为m/s^2
+Byte1~4   Byte5~8   Byte9~12   Byte13~16   Byte17~20   Byte21~24   Byte25~26   Byte27~28   Byte29~30   Byte31~32
+GyroX     GyroY     GyroZ      AccelX      AccelY      AccelZ      QuatW       QuatX       QuatY       QuatZ
+
+0x19
+上位机向下位机查询磁场数据
+5a 06 01 19 00 ff
+
+0x1a
+下位机向上位机回复IMU数据，数据长度为12Byte，数据类型为float类型
+Byte1~4   Byte5~8   Byte9~12 
+MagX      MagY      MagZ 
+
+0x1b
+上位机向下位机查询IMU数据(和0x17区别在于，该指令获取的加速度值已经剔除重力加速的影响，反应的是物体的真实加速度)
+5a 06 01 1b 00 ff
+
+0x1c
+下位机向上位机回复IMU数据，数据长度为40Byte，数据类型为float类型
+Gyro 单位为rad/sec Accel单位为m/s^2
+Byte1~4   Byte5~8   Byte9~12   Byte13~16   Byte17~20   Byte21~24   Byte25~26   Byte27~28   Byte29~30   Byte31~32
+GyroX     GyroY     GyroZ      AccelX      AccelY      AccelZ      QuatW       QuatX       QuatY       QuatZ
+
+
+0x18
+下位机向上位机回复IMU数据，数据长度为40Byte，数据类型为float类型
+Gyro 单位为rad/sec Accel单位为m/s^2
+Byte1~4   Byte5~8   Byte9~12   Byte13~16   Byte17~20   Byte21~24   Byte25~26   Byte27~28   Byte29~30   Byte31~32
+GyroX     GyroY     GyroZ      AccelX      AccelY      AccelZ      QuatW       QuatX       QuatY       QuatZ
+     
+
+0xf1
+上位机向下位机查询版本号
+例:5a 06 01 f1 00 d7
+
+0xf2
+下位机回复版本号，数据长度为6Byte,格式为硬件版本号xx.yy.zz,软件版本号aa.bb.cc，
+Byte1   Byte2   Byte3   Byte4   Byte5   Byte6
+xx      yy      zz      aa      bb      cc
+
+0xf3
+上位机向下位机查询主板SN号
+例:5a 06 01 f3 00 46
+
+0xf4
+下位机回复版本号，数据长度为12Byte,高位在前，低位在后
+Byte1~12 
+SN号
+
+0xfd
+上位机向下位机发送重启指令,下位机无回复
+例:5a 06 01 fd 00 9a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

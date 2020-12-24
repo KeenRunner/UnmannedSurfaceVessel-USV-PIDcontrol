@@ -1,0 +1,12 @@
+软件出现“无法安装这个硬件”“INF中的服务安装段落无效”问题的解决办法
+
+mdmcpq.inf
+usbser.sys
+ 
+将mdmcpq.inf复制到c:\windows\inf 
+将usbser.sys复制到c:\windows\system32\drivers
+
+小技巧：比如要打开c:\windows\inf,只要在地址栏（IE输入网址的地址栏和我的电脑里的地址栏都一样），输入c:\windows\inf即可打开。
+
+参见此贴：http://openedv.com/posts/list/22058.htm
+ 

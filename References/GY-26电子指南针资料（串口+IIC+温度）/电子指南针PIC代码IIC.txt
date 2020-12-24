@@ -1,0 +1,197 @@
+/*****************************************
+* 基于PIC单片机GY-26模块通信程序 		 *
+* 功    能：IIC通信读取数据并显示        *
+* 时钟频率：4M晶振 						 *
+* 设    计：广运电子					 *
+* 修改日期：2010年10月26日				 *
+* 编译环境：MPLAB-IDEv8.60+HI-TECHv9.60  *
+* 实验环境：PIC16F877A+1602    			 *
+* 使用端口：RC7,RC6,RC5,RC4,RC3,PORTD 	 *
+* 参    考：网友24c02IIC程序，1602程序   *
+*****************************************/
+#include <pic.h>    //调用头文件
+#include <stdio.h>
+__CONFIG(0x3F32);   //芯片配置字		   
+#define  uchar unsigned char
+#define  uint  unsigned int
+#define  ulint unsigned long int	
+#define  GY_26_ADDR	 0xE0	           //定义电子指南针器件地址(出厂默认为0XE0)									
+#define  LCD_DATA_PORT    PORTD        //定义LCD的D0-D7所在端口
+#define  LCD_DATA_POUT    TRISD= 0x00  //定义LCD数据端口为输出
+#define  LCD_DATA_PIN     TRISD= 0xFF  //定义LCD数据端口为输入(在读LCD状态时用到)
+#define  LCD_Control_OUT  TRISC&=0X1F  //定义LCD控制端口输出
+#define  LCD_EN           RC7          //LCD对应端口
+#define  LCD_RW           RC6          //LCD对应端口
+#define  LCD_RS           RC5          //LCD对应端口
+//函数申明********************************** 
+void	delay_20us(uint nus);
+void	nms_delay(uint nms);
+void	mcu_init(void);
+void 	lcd_init(void);
+void 	LCD_en_write(void);
+void 	wait_LCD_Ready(void);
+void 	set_LCD_xy(uchar x, uchar y );
+void 	LCD_write_onechar(uchar COMM,uchar DAT);
+void 	LCD_write_string(uchar X,uchar Y,uchar *string);
+uint 	get_GY_26(uchar read_begin_address,uchar GY_26_cmd);
+void 	conversion(uint i); 
+//iic使用函数********************************
+void  	iic_Start(void){SEN=1;while(SEN);}    //启动iic
+void  	iic_Stop (void){PEN=1;while(PEN);}	  //停止iic
+void  	iic_rest (void){RSEN=1;while(RSEN);}  //重启iic 
+void  	iic_Write8Bit(uchar x){SSPIF=0;SSPBUF=x;while(!SSPIF);SSPIF=0;}//向iic总线写8bit数据                
+uchar 	iic_read8Bit(void){RCEN=1;while(!BF);ACKEN=1;while(ACKEN);return SSPBUF;}//向iic总线读8bit数据 
+//数组****************************************
+uchar	START_DISPLAY1[16]={"Compass:       "};//LCD初始化显示数据
+uchar 	START_DISPLAY2[16]={"  Temp :       "};//LCD初始化显示数据  
+uchar 	display[7]={0,0,0,'.',0,0Xdf,0};     //显示数据数组
+/*********************************************
+数据转换,十六进制数据转换成10进制
+输入十六进制范围：0x0000-0x270f（0-9999）
+结果分成个十百千位，以ascii存入显示区
+**********************************************/
+void conversion(unsigned int i)  
+{  
+	display[0]=i/1000+0x30 ;
+    i=i%1000;    //取余运算
+    display[1]=i/100+0x30 ;
+    i=i%100;    //取余运算
+    display[2]=i/10+0x30 ;
+    i=i%10;     //取余运算
+    display[4]=i+0x30;  
+}
+//单片机初始化**************
+void mcu_init(void)
+{
+	TRISC=0XFF;             //IIC通信引脚设为输入	
+	SSPSTAT = 0x80;         //IIC设置
+	SSPCON  = 0x38;         //IIC设置
+	SSPCON2 = 0x00;         //IIC设置
+	SSPADD  = 50;			//IIC设置                 
+}
+//LCD初始化***************************
+void lcd_init(void)
+{
+    nms_delay(100);
+	LCD_DATA_POUT;             //LCD数据口设为输出
+    LCD_Control_OUT;
+    LCD_write_onechar(0x38,0);
+    LCD_write_onechar(0x08,0);   
+    LCD_write_onechar(0x01,0);   
+    LCD_write_onechar(0x06,0);    
+    LCD_write_onechar(0x0C,0);   
+}
+//LCD写使能****************************** 
+void LCD_en_write(void)       
+{
+    LCD_EN=1;
+   // delay_20us(1);  //E脉冲周期最小150ns
+    LCD_EN=0;
+}
+//等待LCD空闲****************************
+void wait_LCD_Ready(void)
+{
+    uchar temp1;
+    LCD_DATA_PORT=0XFF;
+    LCD_DATA_PIN;      //准备判断LCD忙标志
+    LCD_RS=0;
+    LCD_RW=1;          //读
+    LCD_EN=1;
+    delay_20us(1); 
+    while((temp1=PORTD & 0X80));
+	LCD_EN=0;
+	LCD_RS=1;
+	LCD_DATA_POUT;
+}
+//LCD写一个字符**********************
+void LCD_write_onechar(uchar COMM,uchar DAT)
+{
+	wait_LCD_Ready();         //等待LCD空闲
+	LCD_RW=0;                 //写        
+ 	if(COMM==0){              //写数据    
+	 LCD_RS=1;                //RS高电平向LCD写数据
+	 LCD_DATA_PORT=DAT;
+	}
+	else{                     //写命令        
+	 LCD_RS=0;
+	 LCD_DATA_PORT=COMM;
+	}
+	 LCD_en_write();
+	 delay_20us(1); 
+	 LCD_RW=1;
+	 LCD_RS=1;
+}
+//LCD写字符到指定坐标******************************
+void LCD_write_string(uchar X,uchar Y,uchar *string)
+{
+    set_LCD_xy( X, Y );        //设置LCD显示坐标
+    while (*string)
+    {
+	 LCD_write_onechar(0,*string );
+	 string ++;                //指向下一显示字符地址
+    }
+}
+//LCD写坐标设置**********************************
+void set_LCD_xy(uchar x, uchar y )
+{
+    uchar DIS_address;
+    if (y == 0)
+	 DIS_address = 0x80 + x;               //第一行X列
+    else
+	 DIS_address = 0xc0 + x;
+	 LCD_write_onechar( DIS_address, 0 );  //第二行X列
+}
+//延时大约20us***************************************
+void delay_20us(uint nus)
+{  uchar i;
+   while(--nus){
+   for(i=2;i>0;i--);
+   }        
+}
+//延时大约1ms***************************************
+void nms_delay(uint nms)
+{
+	while(nms--)
+	delay_20us(50);
+}
+//从IIC总线获得电子指南针GY-26数据********************
+//从开始地址连续读出两个8bit的值，并合成16bit数据
+uint get_GY_26(uchar read_begin_address,uchar GY_26_cmd)
+{ unsigned int temp;
+    iic_Start();                        //iic启动时序
+    iic_Write8Bit(GY_26_ADDR);          //写指南针器件地址
+    iic_Write8Bit(0);                   //写命令
+    iic_Write8Bit(GY_26_cmd);			//写指南针命令
+    iic_Stop();							//iic写停止时序
+    nms_delay(55);	                    //延时，可执行其他程序
+    iic_Start();                        //iic启动时序
+	ACKDT = 0;							//允许应答ACK
+    iic_Write8Bit(GY_26_ADDR);          //写指南针器件地址     
+    iic_Write8Bit(read_begin_address);	//写指南针内部数据地址 
+    iic_rest();                         //iic重启时序
+    iic_Write8Bit(GY_26_ADDR+1);		//指南针器件地址+1=读 
+    temp=iic_read8Bit();                //读出8位数据
+    temp<<=8;                           //保存数据
+    ACKDT = 1;                          //允许应答NO_ACK
+   	temp+=iic_read8Bit();				//读出8位数据			
+    iic_Stop();                         //发送停止时序
+	return temp;                        //返回本次测量数值
+}
+//主程序************************************************
+void main(void)
+{   unsigned int  CMP_DATA,TEMP_DATA; 
+	mcu_init();                          //单片机初始化
+	lcd_init();                          //lcd1602初始化          
+	LCD_write_string(0,0,START_DISPLAY1);//LCD初始化显示数据
+	LCD_write_string(0,1,START_DISPLAY2);//LCD初始化显示数据
+	while(1)
+    {      
+	  CMP_DATA=get_GY_26(1,0x31);       //读取角度
+	  conversion(CMP_DATA);             //数据转换出个，十，百，千 位         
+	  LCD_write_string(9,0,display);    //显示角度，从第0行第9列开始   
+	  TEMP_DATA=get_GY_26(5,0x35);      //读取温度
+	  conversion(TEMP_DATA);            //数据转换出个，十，百，千 位  
+	  LCD_write_string(9,1,display);    //显示角度，从第1行第9列开始   
+    }                
+}
+
