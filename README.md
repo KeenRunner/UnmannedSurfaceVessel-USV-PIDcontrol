@@ -33,7 +33,9 @@
 + src文件夹内是各个模块的package  
 + GPS模块ublox的使用可以参考https://www.ncnynl.com/archives/201905/3053.html  
 + 电子罗盘和IMU的参考资料已上传到References文件夹内
-+ sensor_sub/src/compass_pub.cpp && gps_test.cpp实现了对电子罗盘compass && gps原始测量信息的处理和发布  
-+ centre_control/src/compass_pid_test.cpp 实现了原地旋转功能 gps_pid_test.cpp 实现了单点直线运动功能 multi_point.cpp 实现了多点巡航功能
-其余代码均为实验过程中的测试文件
++ sensor_sub/src/compass_pub.cpp && gps_test.cpp 实现了对电子罗盘compass && gps原始测量信息的处理和发布  
++ centre_control/src/compass_pid_test.cpp 实现了原地旋转功能  
+  gps_pid_test.cpp 实现了单点直线运动功能  
+  multi_point.cpp 实现了多点巡航功能  
+其余代码均为实验过程中的测试文件  
 **注意：**部分代码未编写.launch文件，如要运行请使用roscore + rosrun命令
