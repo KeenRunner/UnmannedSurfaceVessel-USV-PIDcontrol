@@ -6,9 +6,10 @@
  <img src="https://github.com/KeenRunner/UnmannedSurfaceVessel-USV-PIDcontrol/blob/master/References/structure.png?raw=true" 
  width = "300" height = "300" align=center />  
 电子罗盘Compass、惯性测量单元IMU、全球定位系统GPS会实时测量无人艇的角度、角加速和位置  
-并作为Publisher 广播测量到的数据
+并作为Publisher 广播测量到的数据  
 无人艇上的计算单元（此处为一台Mini PC）作为Subscriber接收数据并进行相应计算，得到船体的角加速度和线加速度  
-对计算出的加速度做简单处理后用串口发送给下位机（此处使用STM32F4），下位机输出PWM波驱动电机，实现船体的运动
+对计算出的加速度做简单处理后用串口发送给下位机（此处使用STM32F4），下位机输出PWM波驱动电机，实现船体的运动  
+***
 在实现定点巡航的时候分两步：  
 1.原地旋转，将船头方向对准目标点  
 2.前进，在这个过程中继续调整角度的偏差  
