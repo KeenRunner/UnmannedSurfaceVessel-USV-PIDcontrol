@@ -37,5 +37,6 @@
 + centre_control/src/compass_pid_test.cpp 实现了原地旋转功能  
   gps_pid_test.cpp 实现了单点直线运动功能  
   multi_point.cpp 实现了多点巡航功能  
-其余代码均为实验过程中的测试文件  
-**注意：**部分代码未编写.launch文件，如要运行请使用roscore + rosrun命令
+  
+ 其余代码均为实验过程中的测试文件  
+ **注意：** 部分代码未编写.launch文件，如要运行请使用roscore + rosrun命令
