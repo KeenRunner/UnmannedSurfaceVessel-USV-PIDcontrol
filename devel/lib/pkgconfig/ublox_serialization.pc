@@ -1,0 +1,8 @@
+prefix=/home/bookfarmer/catkin_ws/devel
+
+Name: ublox_serialization
+Description: Description of ublox_serialization
+Version: 1.1.2
+Cflags: -I/home/bookfarmer/catkin_ws/src/ublox/ublox_serialization/include
+Libs: -L${prefix}/lib 
+Requires: roscpp roscpp_serialization

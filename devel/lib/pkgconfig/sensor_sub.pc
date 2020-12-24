@@ -1,0 +1,8 @@
+prefix=/home/bookfarmer/catkin_ws/devel
+
+Name: sensor_sub
+Description: Description of sensor_sub
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

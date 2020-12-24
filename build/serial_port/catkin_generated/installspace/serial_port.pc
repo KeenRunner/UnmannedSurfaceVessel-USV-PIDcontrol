@@ -1,0 +1,8 @@
+prefix=/home/bookfarmer/catkin_ws/install
+
+Name: serial_port
+Description: Description of serial_port
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

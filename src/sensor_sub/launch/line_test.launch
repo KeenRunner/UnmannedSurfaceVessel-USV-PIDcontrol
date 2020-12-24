@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+  <arg name="node_name" default="gps" /> 
+  <arg name="param_file_name" default="m8u_rover" doc="name of param file, e.g. rover" />
+  <arg name="output" default="log" />
+  <arg name="respawn" default="true" />
+  <arg name="respawn_delay" default="30" />
+  <arg name="clear_params" default="true" />
+
+  <node pkg="ublox_gps" type="ublox_gps" name="$(arg node_name)"
+        output="$(arg output)" 
+        clear_params="$(arg clear_params)"
+        respawn="$(arg respawn)" 
+        respawn_delay="$(arg respawn_delay)">
+    <rosparam command="load" 
+              file="$(find ublox_gps)/config/$(arg param_file_name).yaml" />
+  </node>
+
+
+	<node pkg="sensor_sub" type="line_test" name="line_test" output="screen">
+		<rosparam param="obj_p_list" >[120.136157, 30.276228]</rosparam>
+		<param name="amp_factor"	type = "int"	value="50000"/>
+		<param name="pos_kp"		type = "int"	value="3"/>
+		<param name="pos_kd"		type = "int"	value="4"/>
+		<param name="pos_ki"		type = "int"	value="0"/>
+		<param name="pos_dt"		type = "double"	value="0.25"/>
+		<param name="distance_thresh"	type = "double"	value="0.5"/>
+	
+	</node>
+
+</launch>
+

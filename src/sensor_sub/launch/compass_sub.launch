@@ -1,0 +1,8 @@
+<launch>
+
+	<node pkg="sensor_sub" type="compass_pub" name="compass_pub" output="screen" >
+		<param name="freq"   value="2"/>
+	</node>
+</launch>
+
+
