@@ -1,0 +1,8 @@
+prefix=/home/bookfarmer/catkin_ws/devel
+
+Name: ublox_msgs
+Description: Description of ublox_msgs
+Version: 1.1.2
+Cflags: -I/home/bookfarmer/catkin_ws/devel/include -I/home/bookfarmer/catkin_ws/src/ublox/ublox_msgs/include
+Libs: -L${prefix}/lib -lublox_msgs
+Requires: message_runtime ublox_serialization std_msgs sensor_msgs

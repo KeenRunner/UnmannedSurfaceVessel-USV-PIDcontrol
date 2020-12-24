@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+	<!-- GPS receiver -->
+	<arg name="node_name" default="gps" /> 
+	<arg name="param_file_name" default="m8u_rover" doc="name of param file, e.g. rover" />
+	<arg name="output" default="log" />
+	<arg name="respawn" default="true" />
+	<arg name="respawn_delay" default="30" />
+	<arg name="clear_params" default="true" />
+
+	<node pkg="ublox_gps" type="ublox_gps" name="$(arg node_name)"
+        output="$(arg output)" 
+        clear_params="$(arg clear_params)"
+        respawn="$(arg respawn)" 
+        respawn_delay="$(arg respawn_delay)">
+    <rosparam command="load" 
+        	file="$(find ublox_gps)/config/$(arg param_file_name).yaml" />
+	</node>
+	
+
+	<arg name="compass_sub_freq" default="4" />
+	<arg name="ang_dt" default="0.25" />
+	<!-- compass publisher -->
+	<node pkg="sensor_sub" type="compass_pub" name="compass_pub">
+		<param name="freq"   value="$(arg compass_sub_freq)"/>
+		<param name="serial_port"   value="/dev/ttyUSB0"/>
+	</node>
+
+	<!-- centre controller -->
+	<node pkg="centre_control" type="gps_pid_test" name="gps_pid_test" output="screen">
+		<param name="serial_port"	value="/dev/ttyUSB1"/>
+		<!-- 角度参数 -->
+		<rosparam param="ang_kp_kd_ki_1" >[5,3,0.5]</rosparam>
+		<rosparam param="ang_kp_kd_ki_2" >[5,3,0.5]</rosparam>
+
+		<param name="l_acc_factor"	type = "double"	value="-5.0"/>
+		<param name="r_acc_factor"	type = "double"	value="5.0"/>
+		<param name="ang_dt"	type = "double"	value="$(arg ang_dt)"/>
+		<param name="ang_thresh"	type = "double"	value="0.1"/>
+		<param name="ang_vel_thresh"	type = "double"	value="0.1"/>
+		<param name="ang_pwm_max"	type = "int"	value="250"/>
+
+		<!-- 位置参数 -->
+		<rosparam param="obj_p_list" >[120.136107, 30.276224]</rosparam>
+		<param name="amp_factor"	type = "int"	value="60000"/>
+
+		<rosparam param="pos_kp_kd_ki_1" >[8,4,0]</rosparam>
+		<rosparam param="pos_kp_kd_ki_2" >[8,4,0]</rosparam>
+
+		<param name="pos_dt"		type = "double"	value="0.25"/>
+		<param name="distance_thresh"	type = "double"	value="5"/>
+		<param name="linear_acc_max"	type = "int"	value="250"/>
+		<param name="pos_param_switch"		type = "double"	value="20"/>
+		<param name="ang_param_switch"		type = "double"	value="0.52"/>
+	</node>
+
+	<!-- IMU launch file -->
+	<include file="$(find sensor_imu)/launch/sensor_imu.launch" />
+
+</launch>
+
