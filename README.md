@@ -27,8 +27,8 @@
  <img src="https://github.com/KeenRunner/UnmannedSurfaceVessel-USV-PIDcontrol/blob/master/References/formula2.png" 
      width = "260" height = "40" align=center />  
  根据此距离进行PID运算，得到前进的加速度
- 另外，在前进时，角度调整也会继续，保证船头指向目标点
-
+ 另外，在前进时，角度调整也会继续，保证船头指向目标点  
+***
 #### 代码说明
 + src文件夹内是各个模块的package  
 + GPS模块ublox的使用可以参考https://www.ncnynl.com/archives/201905/3053.html  
